@@ -3,6 +3,7 @@ from reportgen.models import ExecResult
 import subprocess
 import sys
 from reportgen.constants import *
+import tempfile
 
 def runPyFile(filePath: Path) -> ExecResult:
 
@@ -16,35 +17,32 @@ def buildCompileCmd(compiler: str, filePath: Path, exePath: Path, flags: list[st
     return [compiler, str(filePath), *flags, "-o", str(exePath)]
 
 def runCppFile(filePath: Path) -> ExecResult:
-    exePath = filePath.with_suffix("")  
+    with tempfile.TemporaryDirectory() as tmp:
+        exePath = Path(tmp) / filePath.stem
 
-    cmd = buildCompileCmd("g++", filePath, exePath, CPP_FLAGS)
+        cmd = buildCompileCmd("g++", filePath, exePath, CPP_FLAGS)
+        compileProcess = subprocess.run(cmd, capture_output=True, text=True)
 
-    compileProcess = subprocess.run(cmd , capture_output=True, text=True)
+        if compileProcess.returncode != 0:
+            return ExecResult( str(filePath), "", "", "", compileProcess.stderr, compileProcess.returncode )
+        runProcess = subprocess.run([str(exePath.resolve())], capture_output=True, text=True)
 
-    if compileProcess.returncode != 0:
-        return ExecResult( str(filePath), "" , "" , "", compileProcess.stderr, compileProcess.returncode)
+        question = extractQuestion(filePath)
+        code = extractCode(filePath)
 
-    runProcess = subprocess.run( [str(exePath.resolve())], capture_output=True, text=True)
-
-    question = extractQuestion(filePath)
-    code = extractCode(filePath)
-
-    return ExecResult( str(filePath), question , code , runProcess.stdout, runProcess.stderr, runProcess.returncode )
+        return ExecResult( str(filePath), question, code, runProcess.stdout, runProcess.stderr, runProcess.returncode )
 
 def runCFile(filePath: Path) -> ExecResult:
-    exePath = filePath.with_suffix("")  
+    with tempfile.TemporaryDirectory() as tmp:
+        exePath = Path(tmp) / filePath.stem
+        cmd = buildCompileCmd("gcc", filePath, exePath, C_FLAGS)
+        compileProcess = subprocess.run(cmd, capture_output=True, text=True)
 
-    cmd = buildCompileCmd("gcc", filePath, exePath, C_FLAGS)
+        if compileProcess.returncode != 0:
+            return ExecResult( str(filePath), "", "", "", compileProcess.stderr, compileProcess.returncode )
+        runProcess = subprocess.run([str(exePath.resolve())], capture_output=True, text=True)
 
-    compileProcess = subprocess.run( cmd , capture_output=True, text=True)
+        question = extractQuestion(filePath)
+        code = extractCode(filePath)
 
-    if compileProcess.returncode != 0:
-        return ExecResult( str(filePath), "" , "" , "", compileProcess.stderr, compileProcess.returncode)
-
-    runProcess = subprocess.run( [str(exePath.resolve())], capture_output=True, text=True)
-
-    question = extractQuestion(filePath)
-    code = extractCode(filePath=filePath)
-
-    return ExecResult( str(filePath), question , code , runProcess.stdout, runProcess.stderr, runProcess.returncode )
+        return ExecResult( str(filePath), question, code, runProcess.stdout, runProcess.stderr, runProcess.returncode )

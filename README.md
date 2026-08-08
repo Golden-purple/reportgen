@@ -29,7 +29,7 @@ This installs the `reportgen` command on your PATH (via the entry point defined 
 
 `reportgen` uses system tools it does **not** install for you:
 
-| Tool | Needed for | Install (Fedora/Debian) |
+| Tool | Needed for | Install (Fedora) |
 |---|---|---|
 | `gcc` | Running `.c` files | usually preinstalled / `sudo dnf install gcc` |
 | `g++` | Running `.cpp` files | `sudo dnf install gcc-c++` |
