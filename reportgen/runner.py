@@ -1,6 +1,6 @@
-from models import ExecResult
-from utils import *
-from compiler import *
+from reportgen.models import ExecResult
+from reportgen.utils import *
+from reportgen.compiler import *
 
 map = {
     ".py" : runPyFile,

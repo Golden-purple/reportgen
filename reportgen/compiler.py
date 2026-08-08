@@ -1,8 +1,8 @@
-from extractor import *
-from models import ExecResult
+from reportgen.extractor import *
+from reportgen.models import ExecResult
 import subprocess
 import sys
-from constants import *
+from reportgen.constants import *
 
 def runPyFile(filePath: Path) -> ExecResult:
 

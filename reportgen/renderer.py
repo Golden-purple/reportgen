@@ -1,4 +1,4 @@
-from models import ExecResult
+from reportgen.models import ExecResult
 
 def generateMarkdown(results: list[ExecResult]) -> str:
 

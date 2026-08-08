@@ -1,5 +1,5 @@
 from pathlib import Path
-from constants import *
+from reportgen.constants import *
 
 def getFilesFromDirectory(dirPath: str) -> list[Path]:
     path = Path(dirPath)

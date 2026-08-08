@@ -1,4 +1,9 @@
 learn/
 __pycache__/
 prog_files/
-*.md
+__pycache__/
+*.pyc
+*.pdf
+dist/
+build/
+*.egg-info/

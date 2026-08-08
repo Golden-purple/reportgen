@@ -1,13 +1,13 @@
 import sys
 from pathlib import Path
-from runner import runDirectory
-from renderer import generateMarkdown
-from utils import writeReport
-from pdf import *
+from reportgen.runner import runDirectory
+from reportgen.renderer import generateMarkdown
+from reportgen.utils import writeReport
+from reportgen.pdf import *
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: reportgen <directory>")
+        print("Usage: reportgen < directory/ >")
         sys.exit(1)
 
     inputPath = sys.argv[1]
