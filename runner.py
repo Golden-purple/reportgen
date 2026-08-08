@@ -2,14 +2,14 @@ from models import ExecResult
 from utils import *
 from compiler import *
 
+map = {
+    ".py" : runPyFile,
+    ".cpp" : runCppFile, 
+    ".c" : runCFile
+}
+
 def runFile(filePath: Path) -> ExecResult:
     suffix = filePath.suffix
-
-    map = {
-        ".py" : runPyFile,
-        ".cpp" : runCppFile, 
-        ".c" : runCFile
-    }
 
     runFunction = map[suffix]
     if(runFunction != None) :

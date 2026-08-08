@@ -1,5 +1,5 @@
 from pathlib import Path
-from .constants import SUPPORTED_EXT
+from constants import *
 
 def getFilesFromDirectory(dirPath: str) -> list[Path]:
     path = Path(dirPath)
@@ -12,4 +12,8 @@ def getFilesFromDirectory(dirPath: str) -> list[Path]:
         if f.is_file() and f.suffix in SUPPORTED_EXT :
             files.append(f)
     return sorted(files)  
+
+def writeReport(content: str , fileName: str = "report.md"):
+    with open(fileName, "w") as f:
+        f.write(content)
 
