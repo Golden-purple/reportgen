@@ -24,12 +24,12 @@ def generateMarkdown(results: list[ExecResult]) -> str:
         lines.append("")
 
         lines.append(f"### Question {count}")
-        lines.append(result.question.strip())
+        lines.append(result.question.rstrip())
         lines.append("")
 
         lines.append("### Code")
         lines.append(f"```{lang}")
-        lines.append(result.code.strip())
+        lines.append(result.code.rstrip())
         lines.append("```")
         lines.append("")
 
