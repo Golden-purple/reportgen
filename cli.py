@@ -21,7 +21,7 @@ def main():
     markdownContent = generateMarkdown(results)
 
     outputPath = Path(f"{path.name}.md")
-    writeReport(markdownContent, str(outputPath))
+    writeReport(markdownContent, str(path / outputPath))
 
 if __name__ == "__main__":
     main()
