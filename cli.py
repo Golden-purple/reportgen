@@ -3,6 +3,7 @@ from pathlib import Path
 from runner import runDirectory
 from renderer import generateMarkdown
 from utils import writeReport
+from pdf import *
 
 def main():
     if len(sys.argv) != 2:
@@ -20,8 +21,15 @@ def main():
 
     markdownContent = generateMarkdown(results)
 
-    outputPath = Path(f"{path.name}.md")
-    writeReport(markdownContent, str(path / outputPath))
+    mdPath = path / f"{path.name}.md"
+    writeReport(markdownContent, str(mdPath))
+
+    pdfPath = path / f"{path.name}.pdf"
+
+    try:
+        md2PDF(mdPath=mdPath, pdfPath=pdfPath)
+    except PDFConversionError as e:
+        print(e)
 
 if __name__ == "__main__":
     main()
