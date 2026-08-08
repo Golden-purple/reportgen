@@ -1,6 +1,7 @@
 [project]
 name = "reportgen"
 version = "0.1.0"
+license = { file = "LICENSE" }
 description = "CLI tool to generate PDF reports from existing code"
 authors = [{ name = "Golden Purple" }]
 readme = "README.md"
