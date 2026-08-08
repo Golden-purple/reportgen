@@ -35,7 +35,7 @@ def runCppFile(filePath: Path) -> ExecResult:
 def runCFile(filePath: Path) -> ExecResult:
     exePath = filePath.with_suffix("")  
 
-    cmd = buildCompileCmd("g++", filePath, exePath, C_FLAGS)
+    cmd = buildCompileCmd("gcc", filePath, exePath, C_FLAGS)
 
     compileProcess = subprocess.run( cmd , capture_output=True, text=True)
 
