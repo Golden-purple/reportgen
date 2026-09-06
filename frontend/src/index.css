@@ -1,0 +1,95 @@
+:root {
+  --bg: #38382f;
+  --surface: #424239;
+
+  --text: #e8e4da;
+  --muted: #aaa79e;
+
+  --accent: #e0b578;
+  --border: #5a594f;
+
+  font-family: serif, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button, input {
+  font: inherit;
+}
+
+
+
+
+
+
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 20px;
+  color: rgb(138, 129, 129);
+  font-family: "Georgia", Arial, monospace;
+}
+
+.name {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 5px;
+  user-select: none;
+}
+.name:hover {
+  color: var(--accent);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  width: min(960px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.technical {
+  font-size: 0.9rem;
+}
+
+.notif {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-family: ui-monospace, Courier, monospace;
+  margin-top: 12px;
+}
+
+.github-link {
+  display: flex;
+  align-items: center;
+
+  color: var(--muted);
+}
+.github-link:hover {
+  color: var(--accent);
+}
