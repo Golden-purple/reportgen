@@ -1,4 +1,5 @@
 import React from 'react'
+import Upload from './components/Upload.tsx'
 
 function Header(){
   return (
@@ -35,7 +36,12 @@ function Main() {
               Support for MPI coming later.
             </p>
           </div>
-        </section>        
+        </section>  
+
+        <section className="upload-section">
+          <Upload />
+        </section>
+        
       </main>
     </>
   )
@@ -46,6 +52,7 @@ const App = () => {
     <>
       <Header />
       <Main />
+      
     </>
   )
 }
