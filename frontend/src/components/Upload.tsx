@@ -10,8 +10,16 @@ function handleDrop(event: React.DragEvent<HTMLDivElement>) {
   event.preventDefault();
   const files = event.dataTransfer.files;
   alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
-  // Handle dropped files here 
+  // Handle dropped files here above.
   // Default: giving input as file directly gives file list, but drag and drop gives a dataTransfer object which contains the files
+}
+
+function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+  const files = event.target.files;
+  if (files) {
+    alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+  }
+  // Handle selected files here inside if statement
 }
 
 const Upload = () => {
@@ -22,7 +30,7 @@ const Upload = () => {
           Upload from device
         </button>
 
-        <input hidden type="file" ref={fileInputRef} multiple accept=".py, .cpp, .c"/>
+        <input hidden type="file" ref={fileInputRef} onChange={handleChange} multiple accept=".py, .cpp, .c"/>
 
         <p>Or</p>
 
