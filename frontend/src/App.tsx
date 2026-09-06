@@ -30,7 +30,7 @@ function Main() {
               Upload your assignments and generate a .md / PDF report automatically.
             </p>
             <p className="technical">
-              For .py, .cpp, .c files. (.cpp and .c files may be executed with OpenMP.)
+              For .py, .cpp, .c files. (OpenMP supported for both C++ and C.)
             </p>
             <p className="notif">
               Support for MPI coming later.
@@ -41,7 +41,7 @@ function Main() {
         <section className="upload-section">
           <Upload />
         </section>
-        
+
       </main>
     </>
   )

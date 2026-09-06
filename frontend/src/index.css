@@ -50,7 +50,7 @@ button, input {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border);
+  /* border-bottom: 1px solid var(--border); */
   padding: 20px;
   color: rgb(138, 129, 129);
   font-family: "Georgia", Arial, monospace;
@@ -110,6 +110,7 @@ button, input {
   margin-top: 10px;
   gap: 10px;
   font-family: "Georgia", Courier, monospace;
+  user-select: none;
 }
 
 .dragNdrop {
@@ -123,10 +124,12 @@ button, input {
   display: flex;
   align-items: center;
   justify-content: center;
+
+  cursor: grabbing;
 }
 
 .upload-button {
-  border: 1px inset var(--accent);
+  border: 2px inset var(--accent);
   border-radius: 5px;
   background-color: var(--surface);
   color: var(--text);
