@@ -53,6 +53,12 @@ app.post("/api/upload", uploadConfig.array("files", 7), (req, res) => {
                 file: file.originalname
             });
         }
+        if(file.size === 0){
+            return res.status(422).json({
+                message: "Uploaded file can't be empty",
+                file: file.originalname
+            });
+        }
     }
 
     res.status(200).json({
