@@ -6,20 +6,61 @@ function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
   // by default the browser will not allow dropping elements into a div, so we need to prevent the default behavior
 }
 
+function buildFormData(files: FileList){
+  const formData = new FormData();
+  for(const file of files){
+    formData.append("files", file);
+  }
+  for(const [fieldName, value] of formData.entries()){
+    console.log(fieldName, value);
+  } 
+  return formData;
+}
+
 function handleDrop(event: React.DragEvent<HTMLDivElement>) {
   event.preventDefault();
   const files = event.dataTransfer.files;
-  alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+  // alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
   // Handle dropped files here above.
   // Default: giving input as file directly gives file list, but drag and drop gives a dataTransfer object which contains the files
+  if(files && files.length > 0){
+    uploadFiles(files);
+  }
 }
 
 function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
   const files = event.target.files;
-  if (files) {
-    alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+  if (files && files.length > 0) {
+    // alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+    uploadFiles(files);
   }
-  // Handle selected files here inside if statement
+}
+
+async function uploadFiles(files: FileList) {
+    try {
+        const formData = buildFormData(files);
+        const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!res.ok) {
+          let message = `Upload failed HTTP ${res.status}`;
+          const contentType = res.headers.get("content-type");
+
+          if (contentType?.includes("application/json")) {
+            const errorBody = await res.json();
+            message = errorBody.message ?? message;
+          }
+          throw new Error(message);
+        }
+
+        const result = await res.json();
+        console.log("Backend response:", result);
+    } 
+    catch (error) {
+        console.error("Upload failed:", error);
+    }
 }
 
 const Upload = () => {
