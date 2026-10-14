@@ -1,3 +1,5 @@
+[tool.setuptools]
+packages = ["reportgen"]
 [project]
 name = "reportgen"
 version = "0.1.0"
