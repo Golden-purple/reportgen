@@ -1,8 +1,9 @@
 import express from "express"
 import multer from "multer"
 import path from "node:path"
-import { mkdtempDisposable, writeFile } from "node:fs/promises"
+import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
 import os from "node:os"
+import { runEngine } from './engine.js'
 
 const app = express();   
 app.use(express.json());
@@ -65,7 +66,7 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
     }
 
     
-    let workspacePath;
+    let workspacePath, pdfBuffer;
     {
         await using workDir = await mkdtempDisposable( 
             // `await using` essentially makes the cleanup automatic after usage.
@@ -132,14 +133,16 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
             throw failedWrite.reason;
         }
 
-        console.log("All uploaded files were written to disk successfully");
+        // console.log("All uploaded files were written to disk successfully");
+        await runEngine(workspacePath);
+        pdfBuffer = await readFile( path.join(workspacePath, "work.pdf") );
+
     }
 
     console.log(`Removed work directory: ${workspacePath}`);
 
-    res.status(200).json({
-        message: "Uploaded files received successfully"
-    });
+    res.status(200).attachment("generated_report.pdf").send(pdfBuffer);
+
 });
 
 app.use((req, res) => {
