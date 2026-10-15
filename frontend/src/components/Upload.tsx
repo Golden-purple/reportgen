@@ -1,102 +1,140 @@
-import React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 import PreviewPDF from './PreviewPDF.tsx';
 
-function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-  event.preventDefault();     
-  // by default the browser will not allow dropping elements into a div, so we need to prevent the default behavior
-}
+type UploadStatus = 'idle' | 'processing' | 'ready' | 'error';
 
-function buildFormData(files: FileList){
+function buildFormData(files: File[]) {
   const formData = new FormData();
-  for(const file of files){
-    formData.append("files", file);
+  for (const file of files) {
+    formData.append('files', file);
   }
-  for(const [fieldName, value] of formData.entries()){
-    console.log(fieldName, value);
-  } 
   return formData;
 }
 
+function Upload() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadButtonRef = useRef<HTMLButtonElement>(null);
+  const processingRef = useRef(false);
+  const [status, setStatus] = useState<UploadStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [fileCount, setFileCount] = useState(0);
 
-const Upload = () => {
+  useEffect(() => {
+    if (!pdfUrl) return;
+    return () => URL.revokeObjectURL(pdfUrl);
+  }, [pdfUrl]);
 
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    const files = event.dataTransfer.files;
-    // alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
-    // Handle dropped files here above.
-    // Default: giving input as file directly gives file list, but drag and drop gives a dataTransfer object which contains the files
-    if(files && files.length > 0){
-      uploadFiles(files);
+    event.dataTransfer.dropEffect = processingRef.current ? 'none' : 'copy';
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (!processingRef.current) {
+      void uploadFiles(Array.from(event.dataTransfer.files));
     }
   }
 
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      // alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
-      uploadFiles(files);
-    }
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    // Reset the input so choosing the same files again can retry a failed request.
+    event.target.value = '';
+    void uploadFiles(files);
   }
 
-  async function uploadFiles(files: FileList) {
+  async function uploadFiles(files: File[]) {
+    if (processingRef.current || files.length === 0) return;
+    processingRef.current = true;
+    setFileCount(files.length);
+    setStatus('processing');
+    setErrorMessage(null);
+    setPdfUrl(null);
+
     try {
-      const formData = buildFormData(files);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: buildFormData(files),
       });
 
       if (!res.ok) {
-        let message = `Upload failed HTTP ${res.status}`;
-        const contentType = res.headers.get("content-type");
-
-        if (contentType?.includes("application/json")) {
-          const errorBody = await res.json();
+        let message = `Upload failed (HTTP ${res.status}). Please try again.`;
+        if (res.headers.get('content-type')?.includes('application/json')) {
+          const errorBody: { message?: string } = await res.json();
           message = errorBody.message ?? message;
         }
         throw new Error(message);
       }
 
       const pdfBin = await res.blob();
-      // console.log(`Received: ${pdfBin.type}. Size: ${pdfBin.size}. ${pdfBin}`);
       setPdfUrl(URL.createObjectURL(pdfBin));
-    } 
-    catch (error) {
-      console.error("Upload failed:", error);
+      setStatus('ready');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setErrorMessage(
+        error instanceof TypeError
+          ? 'Could not reach the report generator. Check that the backend is running and try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not generate the report. Please try again.',
+      );
+      setStatus('error');
+    } finally {
+      processingRef.current = false;
     }
   }
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!pdfUrl) return;
-    return () => URL.revokeObjectURL(pdfUrl);
-  }, [pdfUrl]);
-  
   return (
     <div className="upload-container">
-        <button className="upload-button" onClick={() => fileInputRef.current?.click()}>
-          Upload from device
-        </button>
+      <button
+        className="upload-button"
+        ref={uploadButtonRef}
+        type="button"
+        disabled={status === 'processing'}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {status === 'processing' ? 'Generating report…' : 'Upload from device'}
+      </button>
 
-        <input hidden type="file" ref={fileInputRef} onChange={handleChange} multiple accept=".py, .cpp, .c"/>
+      <input
+        hidden
+        type="file"
+        ref={fileInputRef}
+        onChange={handleChange}
+        multiple
+        accept=".py,.cpp,.c"
+      />
 
-        <p>Or</p>
+      <p className="upload-separator">or</p>
 
-        <div className="dragNdrop" onDragOver={handleDragOver} onDrop={handleDrop}>
-          Drag and Drop all files here
+      <div
+        className="dragNdrop"
+        data-busy={status === 'processing'}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        <strong>Drop your source files here</strong>
+        <span>Python, C, or C++ · up to 7 files · 1 MB each</span>
+      </div>
+
+      {status === 'processing' && (
+        <div className="upload-status" role="status" aria-live="polite">
+          <span className="upload-status__indicator" aria-hidden="true" />
+          <span>Uploading {fileCount} {fileCount === 1 ? 'file' : 'files'} and generating your PDF. This can take a moment.</span>
         </div>
+      )}
 
-        {
-        pdfUrl && (<PreviewPDF pdfUrl={pdfUrl} onClose={() => setPdfUrl(null)}/>)
-        }
+      {status === 'error' && errorMessage && (
+        <p className="upload-error" role="alert">{errorMessage}</p>
+      )}
 
+      {status === 'ready' && pdfUrl && (
+        <PreviewPDF pdfUrl={pdfUrl} onClose={() => setPdfUrl(null)} returnFocusRef={uploadButtonRef} />
+      )}
     </div>
-  )
+  );
 }
 
-export default Upload
+export default Upload;

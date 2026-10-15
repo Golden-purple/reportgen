@@ -40,12 +40,11 @@ button, input {
   font: inherit;
 }
 
-
-
-
-
-
-
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--border2);
+  outline-offset: 3px;
+}
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -105,40 +104,232 @@ button, input {
 .upload-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  margin-top: 10px;
-  gap: 10px;
+  width: min(500px, calc(100vw - 40px));
+  margin: 10px auto 48px;
+  gap: 16px;
   font-family: "Georgia", Courier, monospace;
-  user-select: none;
 }
 
 .dragNdrop {
-  border: 2px inset var(--accent);
-  border-radius: 5px;
-  padding: 20px;
-  margin-top: 10px;
-  width: 500px;
-  height: 250px;
-
+  border: 2px dashed var(--accent);
+  padding: 28px;
+  width: 100%;
+  min-height: 220px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  text-align: center;
+  background: var(--surface);
+}
 
-  cursor: grabbing;
+.dragNdrop strong {
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.dragNdrop span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.dragNdrop[data-busy='true'] {
+  opacity: 0.6;
+}
+
+.upload-separator {
+  margin: 0;
+  color: var(--muted);
 }
 
 .upload-button {
-  border: 2px inset var(--accent);
-  border-radius: 5px;
-  background-color: var(--surface);
-  color: var(--text);
+  border: 0;
+  padding: 13px 25px;
+  min-height: 48px;
+  background-color: var(--accent);
+  color: #27271f;
   cursor: pointer;
 }
 
-.upload-button:hover {
-  border-color: var(--black);
-  background-color: var(--accent);
-  box-shadow: 0px 0px 5px var(--grey);
-  color: var(--surface);
+.upload-button:hover:not(:disabled) {
+  background-color: #efc690;
+}
+
+.upload-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.upload-status,
+.upload-error {
+  width: 100%;
+  margin: 0;
+  padding: 16px 18px;
+  line-height: 1.45;
+  background: var(--surface);
+}
+
+.upload-status {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.upload-status__indicator {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: reportgen-spin 900ms linear infinite;
+}
+
+.upload-error {
+  color: #ffd5c4;
+  background: #593b35;
+}
+
+.pdf-dialog {
+  width: min(1100px, calc(100vw - 40px));
+  height: min(850px, calc(100dvh - 40px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.45);
+}
+
+.pdf-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-dialog::backdrop {
+  background: rgba(10, 10, 8, 0.78);
+}
+
+.pdf-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+}
+
+.pdf-dialog__heading h2 {
+  margin: 0 0 4px;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.1;
+}
+
+.pdf-dialog__heading p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.pdf-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.pdf-download,
+.pdf-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  font: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pdf-download {
+  background: var(--accent);
+  color: #27271f;
+}
+
+.pdf-download:hover {
+  background: #efc690;
+}
+
+.pdf-close {
+  background: #58584e;
+  color: var(--text);
+}
+
+.pdf-close:hover {
+  background: #68685d;
+}
+
+.pdf-frame {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: white;
+}
+
+.pdf-dialog__fallback {
+  margin: 0;
+  padding: 10px 24px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+@keyframes reportgen-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .pdf-dialog {
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+  }
+
+  .pdf-dialog__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 16px 16px;
+  }
+
+  .pdf-dialog__actions {
+    width: 100%;
+  }
+
+  .pdf-download,
+  .pdf-close {
+    flex: 1;
+  }
+
+  .pdf-dialog__fallback {
+    padding: 10px 16px;
+  }
+
+  .dragNdrop {
+    min-height: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-status__indicator {
+    animation: none;
+  }
 }

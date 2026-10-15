@@ -1,4 +1,3 @@
-import React from 'react'
 import Upload from './components/Upload.tsx'
 
 function Header(){
@@ -27,7 +26,7 @@ function Main() {
             <h2>Generate reports from your program files.</h2>
 
             <p>
-              Upload your assignments and generate a .md / PDF report automatically.
+              Upload your assignments and generate a PDF report automatically.
             </p>
             <p className="technical">
               For .py, .cpp, .c files. (OpenMP supported for both C++ and C.)
