@@ -1,5 +1,6 @@
 import React from 'react'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import PreviewPDF from './PreviewPDF.tsx';
 
 function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
   event.preventDefault();     
@@ -17,54 +18,65 @@ function buildFormData(files: FileList){
   return formData;
 }
 
-function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-  event.preventDefault();
-  const files = event.dataTransfer.files;
-  // alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
-  // Handle dropped files here above.
-  // Default: giving input as file directly gives file list, but drag and drop gives a dataTransfer object which contains the files
-  if(files && files.length > 0){
-    uploadFiles(files);
-  }
-}
-
-function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-  const files = event.target.files;
-  if (files && files.length > 0) {
-    // alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
-    uploadFiles(files);
-  }
-}
-
-async function uploadFiles(files: FileList) {
-    try {
-        const formData = buildFormData(files);
-        const res = await fetch("/api/upload", {
-            method: "POST",
-            body: formData
-        });
-
-        if (!res.ok) {
-          let message = `Upload failed HTTP ${res.status}`;
-          const contentType = res.headers.get("content-type");
-
-          if (contentType?.includes("application/json")) {
-            const errorBody = await res.json();
-            message = errorBody.message ?? message;
-          }
-          throw new Error(message);
-        }
-
-        const result = await res.json();
-        console.log("Backend response:", result);
-    } 
-    catch (error) {
-        console.error("Upload failed:", error);
-    }
-}
 
 const Upload = () => {
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    // alert(`Dropped ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+    // Handle dropped files here above.
+    // Default: giving input as file directly gives file list, but drag and drop gives a dataTransfer object which contains the files
+    if(files && files.length > 0){
+      uploadFiles(files);
+    }
+  }
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      // alert(`Selected ${files.length} file(s): ${Array.from(files).map(file => file.name).join(', ')}`);
+      uploadFiles(files);
+    }
+  }
+
+  async function uploadFiles(files: FileList) {
+    try {
+      const formData = buildFormData(files);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) {
+        let message = `Upload failed HTTP ${res.status}`;
+        const contentType = res.headers.get("content-type");
+
+        if (contentType?.includes("application/json")) {
+          const errorBody = await res.json();
+          message = errorBody.message ?? message;
+        }
+        throw new Error(message);
+      }
+
+      const pdfBin = await res.blob();
+      // console.log(`Received: ${pdfBin.type}. Size: ${pdfBin.size}. ${pdfBin}`);
+      setPdfUrl(URL.createObjectURL(pdfBin));
+    } 
+    catch (error) {
+      console.error("Upload failed:", error);
+    }
+  }
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pdfUrl) return;
+    return () => URL.revokeObjectURL(pdfUrl);
+  }, [pdfUrl]);
+  
   return (
     <div className="upload-container">
         <button className="upload-button" onClick={() => fileInputRef.current?.click()}>
@@ -78,6 +90,10 @@ const Upload = () => {
         <div className="dragNdrop" onDragOver={handleDragOver} onDrop={handleDrop}>
           Drag and Drop all files here
         </div>
+
+        {
+        pdfUrl && (<PreviewPDF pdfUrl={pdfUrl} onClose={() => setPdfUrl(null)}/>)
+        }
 
     </div>
   )
