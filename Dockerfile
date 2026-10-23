@@ -15,3 +15,14 @@ COPY pyproject.toml README.md ./
 COPY reportgen/ ./reportgen/
 
 RUN python -m pip install --no-cache-dir .
+
+ARG REPORTGEN_UID=10001 
+ARG REPORTGEN_GID=10001
+
+RUN groupadd --gid "${REPORTGEN_GID}" reportgen && useradd --no-log-init \
+        --uid "${REPORTGEN_UID}" --gid "${REPORTGEN_GID}" \
+        --no-create-home --shell /usr/sbin/nologin reportgen
+
+ENV HOME=/tmp
+
+USER reportgen:reportgen
