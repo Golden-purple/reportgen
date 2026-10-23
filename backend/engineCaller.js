@@ -2,6 +2,16 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 const ENGINE_TIMEOUT_MS = 20000;
 const CONTAINER_TIMEOUT_SEC = 1;
+const ENGINE_CPU_LIMIT = "1.0";
+const ENGINE_MEMORY_LIMIT = "512m";
+const ENGINE_PID_LIMIT = "64";
+const ENGINE_TMPFS = "/tmp:rw,nosuid,nodev,exec,size=128m,mode=1777";
+// C/C++ compilation uses TemporaryDirectory() to store executable in /tmp, so /tmp must be writable and executable.
+// nodev -> no device files. exec -> .o can be executed. mode = 1777 -> temporary directory permissions.
+// dockerArgs has --read-only which makes /app /usr /etc all read only. /tmp and /work are writable.
+// /tmp is writable since we declare it with ENGINE_TMPFS. /work is writable since bind mount overlays a separate writable filesystem.
+const ENGINE_FILE_SIZE_LIMIT = 16 * 1024 * 1024; // 16MB per file quota
+const ENGINE_OPEN_FILES_LIMIT = 256; // Maximum 256 file descriptors
 
 export class EngineTimeoutError extends Error {
     constructor(timeoutMs) {
@@ -41,6 +51,19 @@ export async function runEngine(workspacePath) {
     const dockerArgs = [
         "run", "--rm",
         "--name", containerName,
+
+        "--cpus", ENGINE_CPU_LIMIT,
+        "--memory", ENGINE_MEMORY_LIMIT, "--memory-swap", ENGINE_MEMORY_LIMIT,
+        "--pids-limit", ENGINE_PID_LIMIT, "--init",
+        "--network", "none",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges=true",
+        "--read-only", 
+        "--tmpfs", ENGINE_TMPFS,
+
+        "--ulimit", `fsize=${ENGINE_FILE_SIZE_LIMIT}:${ENGINE_FILE_SIZE_LIMIT}`,
+        "--ulimit", `nofile=${ENGINE_OPEN_FILES_LIMIT}:${ENGINE_OPEN_FILES_LIMIT}`,
+
         "--mount", mountArgument,
         "reportgen-engine:dev", "reportgen", "/work"
     ];
