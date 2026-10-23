@@ -3,7 +3,7 @@ import multer from "multer"
 import path from "node:path"
 import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
 import os from "node:os"
-import { runEngine } from './engineCaller.js'
+import { EngineTimeoutError, runEngine } from "./engineCaller.js"
 
 const app = express();   
 app.use(express.json());
@@ -154,6 +154,17 @@ app.use((err, req, res, next) => {
         return next(err); 
         // next(err) used to ensure same error handling routine isn't repeated twice for a single err.
         // idempotency for error handling basically.
+    }
+
+    if (err instanceof EngineTimeoutError) {
+        // err propogates from engineCaller.js and remains EngineTimeoutError. No error wrapping happens. 
+        // if 'docker stop --timeout 1' itself fails, then it becomes a server side error and not a client-side one.
+        console.error("Report generation timed out:", err);
+
+        return res.status(504).json({
+            message: "Report generation exceeded the 20-second limit.",
+            code: "ENGINE_TIMEOUT"
+        });
     }
 
     if (err instanceof multer.MulterError) {
