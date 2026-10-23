@@ -6,12 +6,15 @@ from reportgen.constants import *
 import tempfile
 
 def runPyFile(filePath: Path) -> ExecResult:
-
-    output = subprocess.run([sys.executable , str(filePath)] , capture_output=True , text=True)
     question = extractQuestion(filePath)
     code = extractCode(filePath)
-    resultObj = ExecResult(str(filePath) , question , code , output.stdout , output.stderr , output.returncode)
-    return resultObj
+
+    try:
+        output = subprocess.run([sys.executable, str(filePath)], capture_output=True, text=True, timeout=PROGRAM_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return ExecResult(str(filePath), question, code, "", f"Execution timed out after {PROGRAM_TIMEOUT_SECONDS} seconds.", TIMEOUT_RETURN_CODE)
+
+    return ExecResult(str(filePath), question, code, output.stdout, output.stderr, output.returncode)
 
 def buildCompileCmd(compiler: str, filePath: Path, exePath: Path, flags: list[str]) -> list[str]:
     return [compiler, str(filePath), *flags, "-o", str(exePath)]
