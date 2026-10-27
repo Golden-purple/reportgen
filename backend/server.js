@@ -6,6 +6,7 @@ import os from "node:os"
 import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine, removeStaleJobContainers } from "./engineCaller.js"
 import { MAX_ACTIVE_JOBS, tryAcquireJobSlot } from "./jobLimiter.js"
 import { removeStaleWorkspaces } from "./workspaceCleanup.js"
+import { register, jobsTotal, jobDurationSeconds, uploadedFilesTotal, uploadRejectionsTotal, classifyJobError, languageForExtension } from "./metrics.js"
 
 const app = express();   
 app.use(express.json());
@@ -20,6 +21,10 @@ const uploadConfig = multer({
 });
 
 app.use((req, res, next) => {
+    if (req.path === "/metrics") {
+        // Prometheus scrapes every 15 s; logging each one would flood the console.
+        return next();
+    }
     console.log(`${req.method} ${req.url}`.toUpperCase());
     next();
     console.log("Request passed through logging middleware");
@@ -33,6 +38,13 @@ app.get("/api/health", (req, res) => {
     res.status(200).send("OK");
 });
 
+// /metrics is unauthenticated. In development it is reachable on port 3000.
+// Feature 3 (deployment) makes sure the reverse proxy forwards only /api/*, so /metrics is never public.
+app.get("/metrics", async (req, res) => {
+    res.set("Content-Type", register.contentType);
+    res.send(await register.metrics());
+});
+
 // app.post("/api/test", (req, res) => {
 //     console.log(req.body.hello);
 //     res.status(200).send("received something from client");
@@ -41,6 +53,7 @@ app.get("/api/health", (req, res) => {
 app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => { 
     // the handler is async since mkdtmp returns a promise. Use await... (mkdtmp function) here, so the handler is to be async
     if(!req.files || req.files.length === 0){
+        uploadRejectionsTotal.inc({ reason: "no_files" });
         return res.status(400).json({
             message: "Upload a minimum of 1 file"
         });
@@ -54,12 +67,14 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
     for(const file of req.files){
         const extension = path.extname(file.originalname).toLowerCase();
         if(!allowedExt.has(extension)){
+            uploadRejectionsTotal.inc({ reason: "unsupported_extension" });
             return res.status(422).json({
                 message: "Only Python, C and C++ files are supported",
                 file: file.originalname
             });
         }
         if(file.size === 0){
+            uploadRejectionsTotal.inc({ reason: "empty_file" });
             return res.status(422).json({
                 message: "Uploaded file can't be empty",
                 file: file.originalname
@@ -69,6 +84,7 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
 
     const releaseJobSlot = tryAcquireJobSlot();
     if (!releaseJobSlot) {
+        jobsTotal.inc({ outcome: "busy" });
         res.set("Retry-After", "5");
         return res.status(503).json({
             message: "The server is busy generating other reports. Please try again in a few seconds.",
@@ -76,9 +92,16 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
         });
     }
 
+    for (const file of req.files) {
+        uploadedFilesTotal.inc({ language: languageForExtension(path.extname(file.originalname).toLowerCase()) });
+    }
+    const endJobTimer = jobDurationSeconds.startTimer();
+    let outcome = "error";
+
     let workspacePath, pdfBuffer;
     try {
-        await using workDir = await mkdtempDisposable( 
+      {
+        await using workDir = await mkdtempDisposable(
             // `await using` essentially makes the cleanup automatic after usage.
             // kinda like a garbage collector but exactly after scope finishes.
             path.join(os.tmpdir(), "reportgen-")
@@ -147,9 +170,18 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
         await runEngine(workspacePath);
         pdfBuffer = await readFile( path.join(workspacePath, "work.pdf") );
 
+      }
+      // Set after the block exits so workspace cleanup time counts and a cleanup failure is an error.
+      outcome = "success";
+    }
+    catch (err) {
+        outcome = classifyJobError(err);
+        throw err;
     }
     finally {
         releaseJobSlot();
+        endJobTimer({ outcome });
+        jobsTotal.inc({ outcome });
     }
 
     console.log(`Removed work directory: ${workspacePath}`);
@@ -204,6 +236,13 @@ app.use((err, req, res, next) => {
         };
 
         const status = (err.code === "LIMIT_FILE_SIZE" || err.code === "LIMIT_FILE_COUNT") ? 413 : 400;
+
+        const rejectionReasons = {
+            LIMIT_FILE_SIZE: "file_too_large",
+            LIMIT_FILE_COUNT: "too_many_files",
+            LIMIT_UNEXPECTED_FILE: "unexpected_field"
+        };
+        uploadRejectionsTotal.inc({ reason: rejectionReasons[err.code] ?? "invalid_upload" });
 
         return res.status(status).json({
             message: messages[err.code] ?? "Invalid upload request",
