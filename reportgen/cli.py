@@ -4,6 +4,7 @@ from reportgen.runner import runDirectory
 from reportgen.renderer import generateMarkdown
 from reportgen.utils import writeReport
 from reportgen.pdf import *
+from reportgen.constants import RENDER_FAILURE_EXIT_CODE
 
 def main():
     if len(sys.argv) != 2:
@@ -29,7 +30,8 @@ def main():
     try:
         md2PDF(mdPath=mdPath, pdfPath=pdfPath)
     except PDFConversionError as e:
-        print(e)
+        print(f"PDF conversion failed: {e}", file=sys.stderr)
+        sys.exit(RENDER_FAILURE_EXIT_CODE)
 
 if __name__ == "__main__":
     main()
