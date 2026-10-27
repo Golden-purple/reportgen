@@ -4,6 +4,7 @@ import path from "node:path"
 import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
 import os from "node:os"
 import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine } from "./engineCaller.js"
+import { MAX_ACTIVE_JOBS, tryAcquireJobSlot } from "./jobLimiter.js"
 
 const app = express();   
 app.use(express.json());
@@ -65,9 +66,17 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
         }
     }
 
-    
+    const releaseJobSlot = tryAcquireJobSlot();
+    if (!releaseJobSlot) {
+        res.set("Retry-After", "5");
+        return res.status(503).json({
+            message: "The server is busy generating other reports. Please try again in a few seconds.",
+            code: "ENGINE_BUSY"
+        });
+    }
+
     let workspacePath, pdfBuffer;
-    {
+    try {
         await using workDir = await mkdtempDisposable( 
             // `await using` essentially makes the cleanup automatic after usage.
             // kinda like a garbage collector but exactly after scope finishes.
@@ -138,6 +147,9 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
         pdfBuffer = await readFile( path.join(workspacePath, "work.pdf") );
 
     }
+    finally {
+        releaseJobSlot();
+    }
 
     console.log(`Removed work directory: ${workspacePath}`);
 
@@ -206,5 +218,6 @@ app.use((err, req, res, next) => {
 
 });
 
+console.log(`Max active report jobs: ${MAX_ACTIVE_JOBS}`);
 app.listen(3000);
 
