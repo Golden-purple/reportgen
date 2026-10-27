@@ -21,6 +21,19 @@ export class EngineTimeoutError extends Error {
     }
 }
 
+export class EngineExitError extends Error {
+    constructor(exitCode, signal) {
+        super(`Docker command failed: exit code ${exitCode}, signal ${signal}`);
+        this.name = "EngineExitError";
+        this.exitCode = exitCode;
+        this.signal = signal;
+    }
+}
+
+// Must equal RENDER_FAILURE_EXIT_CODE in reportgen/constants.py.
+// `docker run` exits with the container's exit code, so this arrives here unchanged.
+export const RENDER_FAILURE_EXIT_CODE = 3;
+
 function runDockerCommand(args) {
     return new Promise((resolve, reject) => {
         const child = spawn("docker", args, {
@@ -36,7 +49,7 @@ function runDockerCommand(args) {
                 resolve();
             } 
             else {
-                reject(new Error(`Docker command failed: exit code ${code}, signal ${signal}`));
+                reject(new EngineExitError(code, signal));
             }
         });
     });

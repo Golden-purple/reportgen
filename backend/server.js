@@ -3,7 +3,7 @@ import multer from "multer"
 import path from "node:path"
 import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
 import os from "node:os"
-import { EngineTimeoutError, runEngine } from "./engineCaller.js"
+import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine } from "./engineCaller.js"
 
 const app = express();   
 app.use(express.json());
@@ -164,6 +164,22 @@ app.use((err, req, res, next) => {
         return res.status(504).json({
             message: "Report generation exceeded the 20-second limit.",
             code: "ENGINE_TIMEOUT"
+        });
+    }
+
+    if (err instanceof EngineExitError && err.exitCode === RENDER_FAILURE_EXIT_CODE) {
+        console.error("PDF rendering failed inside the engine:", err);
+        return res.status(422).json({
+            message: "Your programs ran, but the report could not be converted to PDF. This usually means the code or its output contains characters the PDF engine cannot typeset (for example emoji).",
+            code: "REPORT_RENDER_FAILED"
+        });
+    }
+
+    if (err instanceof EngineExitError) {
+        console.error("Engine container failed:", err);
+        return res.status(500).json({
+            message: "Report generation failed inside the engine.",
+            code: "ENGINE_FAILED"
         });
     }
 
