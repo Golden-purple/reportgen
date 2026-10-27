@@ -3,8 +3,9 @@ import multer from "multer"
 import path from "node:path"
 import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
 import os from "node:os"
-import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine } from "./engineCaller.js"
+import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine, removeStaleJobContainers } from "./engineCaller.js"
 import { MAX_ACTIVE_JOBS, tryAcquireJobSlot } from "./jobLimiter.js"
+import { removeStaleWorkspaces } from "./workspaceCleanup.js"
 
 const app = express();   
 app.use(express.json());
@@ -217,6 +218,16 @@ app.use((err, req, res, next) => {
     });
 
 });
+
+try {
+    const containers = await removeStaleJobContainers();
+    const workspaces = await removeStaleWorkspaces();
+    console.log(`Startup cleanup: removed ${containers} stale containers, ${workspaces} stale workspaces`);
+} catch (error) {
+    // Docker Desktop may not be running yet in development; report generation will fail
+    // loudly later, but the server itself should still start.
+    console.error("Startup cleanup failed:", error);
+}
 
 console.log(`Max active report jobs: ${MAX_ACTIVE_JOBS}`);
 app.listen(3000);
