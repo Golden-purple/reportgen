@@ -9,3 +9,4 @@ build/
 *.egg-info/
 *.md
 .env
+feature specs/
