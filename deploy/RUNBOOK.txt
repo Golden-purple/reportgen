@@ -69,7 +69,11 @@ Section 2. Host settings
 2.2  Do not sleep with the lid closed or when idle on AC power:
        sudo mkdir -p /etc/systemd/logind.conf.d
        printf '[Login]\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\n' | sudo tee /etc/systemd/logind.conf.d/reportgen-no-sleep.conf
-       gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+       /usr/bin/gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+     Use the full path /usr/bin/gsettings. If Anaconda is installed, a bare `gsettings` can resolve to
+     ~/anaconda3/bin/gsettings, which writes to ~/.config/glib-2.0/settings/keyfile (ignored by GNOME)
+     instead of dconf, so the laptop would still suspend after 15 minutes idle.
+     Check:  /usr/bin/gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type   -> 'nothing'
      Do NOT restart systemd-logind (it would end the desktop session). The reboot in 2.6 applies it.
 
 2.3  Tell the user: keep the laptop plugged in during the deployment.
@@ -204,5 +208,5 @@ Section 8. Teardown (back to a normal laptop)
      (add -v to also delete Grafana/Prometheus data)
   sudo firewall-cmd --set-default-zone=<value noted in 2.1>
   sudo rm /etc/systemd/logind.conf.d/reportgen-no-sleep.conf
-  gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
+  /usr/bin/gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
   Optional: sudo tailscale down ; sudo systemctl disable --now docker tailscaled
