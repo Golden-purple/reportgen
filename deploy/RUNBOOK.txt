@@ -1,0 +1,208 @@
+reportgen: deployment runbook for the Fedora laptop
+====================================================
+
+Audience: a Claude Code session running ON the Fedora laptop, working together with the user.
+Goal: serve reportgen publicly via Tailscale Funnel, keep Grafana private to the user's tailnet.
+
+Ground rules for the session following this file:
+- Work through the sections in order. Run each check and show the user the result.
+- STOP and ask the user whenever a check fails, a command needs a browser login, or a step says STOP.
+- Never print or commit passwords. Never commit anything. Never push. Never edit tracked files.
+- `sudo` commands may prompt for the user's password: ask the user to run those in their own terminal
+  if you cannot.
+- The repository is assumed to be cloned at ~/reportgen on branch `agent`. If not, STOP.
+
+------------------------------------------------------------------
+Section 1. Host prerequisites (the user may already have done these)
+------------------------------------------------------------------
+
+1.1  Check the machine:
+       cat /etc/fedora-release
+       uname -m                      -> must be x86_64 (the engine image installs an amd64 pandoc). Otherwise STOP.
+       df -h /                       -> at least 10 GB free (TeX Live image is large).
+
+1.2  Docker CE (from Docker's repository, NOT Fedora's moby-engine):
+       sudo dnf remove -y moby-engine podman-docker docker-cli docker-compose     (fine if nothing is installed)
+       sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+       sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+       sudo systemctl enable --now docker
+       sudo usermod -aG docker "$USER"
+     If the repository has no packages for this Fedora release yet, STOP and tell the user.
+     The group change takes effect after logging out and in (or the reboot in 2.6).
+     Check (after re-login):
+       docker run --rm hello-world
+       docker info --format '{{.SecurityOptions}}'   -> must NOT contain "name=selinux". If it does, STOP.
+
+1.3  Node.js 24 or newer (the backend uses fs mkdtempDisposable and `await using`):
+       dnf info nodejs | grep -i '^version'
+     If that version is 24 or newer:   sudo dnf install -y nodejs npm
+     Otherwise:                        sudo dnf install -y nodejs24 nodejs24-npm
+     Then find the binaries:  node --version ; ls /usr/bin/node* /usr/bin/npm*
+     Use whichever `node` / `npm` (or `node-24` / `npm-24`) reports v24+. Call them NODE and NPM below.
+     If no v24+ binary exists, STOP.
+
+1.4  Tailscale:
+       sudo dnf config-manager addrepo --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+       sudo dnf install -y tailscale
+       sudo systemctl enable --now tailscaled
+       sudo tailscale up
+     `tailscale up` prints a login URL. The USER opens it and logs in. Wait for them.
+     Check: tailscale status   -> shows this machine.
+
+1.5  git and the repository:
+       sudo dnf install -y git
+       git clone https://github.com/Golden-purple/reportgen.git ~/reportgen
+       cd ~/reportgen && git checkout agent && git pull
+
+------------------------------------------------------------------
+Section 2. Host settings
+------------------------------------------------------------------
+
+2.1  Firewall. Fedora Workstation's default zone (FedoraWorkstation) accepts incoming TCP 1025-65535,
+     which would expose the backend's :3000 (including /metrics) to anyone on the same Wi-Fi.
+       firewall-cmd --get-default-zone          -> note the value for teardown (usually FedoraWorkstation)
+       sudo firewall-cmd --set-default-zone=public
+       firewall-cmd --get-active-zones
+     If a connection is listed under a zone other than public or docker, tell the user and ask before
+     moving it.
+
+2.2  Do not sleep with the lid closed or when idle on AC power:
+       sudo mkdir -p /etc/systemd/logind.conf.d
+       printf '[Login]\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\n' | sudo tee /etc/systemd/logind.conf.d/reportgen-no-sleep.conf
+       gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+     Do NOT restart systemd-logind (it would end the desktop session). The reboot in 2.6 applies it.
+
+2.3  Tell the user: keep the laptop plugged in during the deployment.
+
+2.4  Observability secret:
+       cd ~/reportgen/observability
+       test -f .env || printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$(openssl rand -base64 18)" > .env
+       chmod 600 .env
+     Tell the user the Grafana password is in ~/reportgen/observability/.env. Do not print it.
+
+2.5  Confirm the user's account name and the repository path for the service:
+       echo "$USER" ; echo "$HOME/reportgen"
+
+2.6  Reboot now if the docker group or logind change was made in this session:  sudo reboot
+     After the reboot, the user restarts Claude Code in ~/reportgen and continues with section 3.
+
+------------------------------------------------------------------
+Section 3. Build
+------------------------------------------------------------------
+
+3.1  Engine image (several minutes):
+       cd ~/reportgen && docker build -t reportgen-engine:dev .
+
+3.2  Backend dependencies:
+       cd ~/reportgen/backend && NPM ci --omit=dev
+
+3.3  Frontend build:
+       cd ~/reportgen/frontend && NPM ci && NPM run build
+     Check: ls ~/reportgen/frontend/dist/index.html
+
+------------------------------------------------------------------
+Section 4. Install and start the services
+------------------------------------------------------------------
+
+4.1  Backend service (replace NODE with the absolute path of the v24+ binary, e.g. /usr/bin/node):
+       cd ~/reportgen
+       sed -e "s|@USER@|$USER|g" -e "s|@REPO@|$HOME/reportgen|g" -e "s|@NODE@|$(command -v NODE)|g" \
+           deploy/reportgen-backend.service | sudo tee /etc/systemd/system/reportgen-backend.service
+       sudo systemd-analyze verify /etc/systemd/system/reportgen-backend.service
+       sudo systemctl daemon-reload
+       sudo systemctl enable --now reportgen-backend
+     Check:
+       systemctl status reportgen-backend --no-pager      -> active (running)
+       journalctl -u reportgen-backend -n 20 --no-pager   -> "Startup cleanup: removed ..." and "Max active report jobs: 2"
+     If journalctl shows "permission denied" on /var/run/docker.sock, the user is not in the docker
+     group yet (re-login / reboot) -> STOP.
+
+4.2  Observability and proxy:
+       cd ~/reportgen
+       docker compose -f observability/docker-compose.yml up -d
+       docker compose -f deploy/docker-compose.yml up -d
+       docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
+     Every published port must start with 127.0.0.1.
+
+------------------------------------------------------------------
+Section 5. Local verification (all on the Fedora laptop)
+------------------------------------------------------------------
+
+Create test inputs in a scratch directory (not in the repo):
+  mkdir -p /tmp/rg-test && cd /tmp/rg-test
+  printf '"""\nPrint a greeting.\n"""\nprint("hello from reportgen")\n' > ok.py
+  printf '/*\nPrint a number.\n*/\n#include <stdio.h>\nint main(void){printf("%%d\\n", 42);return 0;}\n' > ok.c
+  printf '"""\nLoop forever.\n"""\nwhile True:\n    pass\n' > loop.py
+
+5.1  curl -s http://127.0.0.1:8080/api/health                      -> OK
+5.2  curl -s http://127.0.0.1:8080/ | head -c 200                   -> HTML of the React app
+5.3  curl -s http://127.0.0.1:8080/metrics | grep -c reportgen_jobs_total   -> 0 (metrics are NOT exposed via the proxy)
+5.4  curl -s -o ok.pdf -w '%{http_code}\n' -F files=@ok.py -F files=@ok.c http://127.0.0.1:8080/api/upload
+                                                                     -> 200 ; then: file ok.pdf -> "PDF document"
+     A 500 with ENGINE_FAILED here almost always means the workspace permission problem: STOP and show
+     `journalctl -u reportgen-backend -n 50 --no-pager`.
+5.5  for i in 1 2 3 4 5 6 7; do cp loop.py loop$i.py; done
+     curl -s -w '\n%{http_code}\n' -F files=@loop1.py -F files=@loop2.py -F files=@loop3.py -F files=@loop4.py \
+          -F files=@loop5.py -F files=@loop6.py -F files=@loop7.py http://127.0.0.1:8080/api/upload
+                                                                     -> 504 with code ENGINE_TIMEOUT (takes ~20 s)
+5.6  docker ps -a --filter name=reportgen-job- --format '{{.Names}}'  -> empty
+     sudo ls -la /var/lib/reportgen                                  -> no reportgen-* directories left
+5.7  curl -s http://127.0.0.1:9090/api/v1/targets | grep -o '"health":"[a-z]*"'   -> "health":"up" (allow 30 s)
+     If "down": firewalld may be blocking the Docker bridge -> STOP and show `firewall-cmd --get-active-zones`.
+5.8  curl -s http://127.0.0.1:3001/api/health                       -> contains "database": "ok"
+
+------------------------------------------------------------------
+Section 6. Go public with Tailscale
+------------------------------------------------------------------
+
+6.1  Public app (Funnel, port 443 -> Caddy):
+       sudo tailscale funnel --bg 8080
+     The first time, it prints a link to enable HTTPS / Funnel for the tailnet. The USER opens it and
+     approves. Then run the command again.
+     Check: tailscale funnel status   -> https://<machine>.<tailnet>.ts.net (Funnel on) -> http://127.0.0.1:8080
+
+6.2  Private Grafana (Serve, tailnet only, port 8443):
+       sudo tailscale serve --bg --https=8443 http://127.0.0.1:3001
+     Check: tailscale serve status  -> :8443 listed WITHOUT "Funnel on".
+
+6.3  Public checks. Ask the USER to do these from their PHONE ON MOBILE DATA (Wi-Fi off):
+       - open https://<machine>.<tailnet>.ts.net  -> the app loads; upload ok.py -> PDF preview works
+       - open https://<machine>.<tailnet>.ts.net/metrics -> the React app page, NOT Prometheus text
+       - open https://<machine>.<tailnet>.ts.net:8443 -> must FAIL to load (Grafana is not public)
+     Then from the user's Windows laptop with the Tailscale app installed and signed in to the same account:
+       - open https://<machine>.<tailnet>.ts.net:8443 -> Grafana login (user admin, password from .env)
+     If Grafana login fails with "origin not allowed", use this fallback from the Windows laptop instead:
+       ssh -L 3001:127.0.0.1:3001 <user>@<machine>     (requires: sudo systemctl enable --now sshd on Fedora)
+       then open http://localhost:3001
+
+6.4  Reboot test: sudo reboot. After it comes back, without running anything else:
+       systemctl is-active reportgen-backend docker tailscaled   -> active x3
+       docker ps --format '{{.Names}}'                           -> caddy, prometheus, grafana containers
+       tailscale funnel status                                   -> still on
+     Then repeat 5.4.
+
+------------------------------------------------------------------
+Section 7. Operating it
+------------------------------------------------------------------
+
+Logs:            journalctl -u reportgen-backend -f
+Restart backend: sudo systemctl restart reportgen-backend
+Deploy new code: cd ~/reportgen && git pull
+                 docker build -t reportgen-engine:dev .                     (if reportgen/ or Dockerfile changed)
+                 cd backend && NPM ci --omit=dev && sudo systemctl restart reportgen-backend
+                 cd ../frontend && NPM ci && NPM run build                  (Caddy serves the new dist/ at once)
+Take offline:    sudo tailscale funnel --https=443 off
+
+------------------------------------------------------------------
+Section 8. Teardown (back to a normal laptop)
+------------------------------------------------------------------
+
+  sudo tailscale funnel reset ; sudo tailscale serve reset
+  sudo systemctl disable --now reportgen-backend
+  sudo rm /etc/systemd/system/reportgen-backend.service && sudo systemctl daemon-reload
+  cd ~/reportgen && docker compose -f deploy/docker-compose.yml down && docker compose -f observability/docker-compose.yml down
+     (add -v to also delete Grafana/Prometheus data)
+  sudo firewall-cmd --set-default-zone=<value noted in 2.1>
+  sudo rm /etc/systemd/logind.conf.d/reportgen-no-sleep.conf
+  gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
+  Optional: sudo tailscale down ; sudo systemctl disable --now docker tailscaled

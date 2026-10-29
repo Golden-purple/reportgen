@@ -1,0 +1,26 @@
+# Template. RUNBOOK.txt fills @USER@, @REPO@ and @NODE@ and installs it to /etc/systemd/system/.
+[Unit]
+Description=reportgen backend (Express API on :3000)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@REPO@/backend
+Environment=NODE_ENV=production
+Environment=REPORTGEN_MAX_ACTIVE_JOBS=2
+# Job workspaces live here instead of /tmp. Mode 0711 stops other users listing them.
+Environment=TMPDIR=/var/lib/reportgen
+StateDirectory=reportgen
+StateDirectoryMode=0711
+ExecStart=@NODE@ server.js
+Restart=always
+RestartSec=3
+# Do NOT add PrivateTmp=yes. Workspace paths are passed to the Docker daemon, which must see
+# the same filesystem as this process.
+
+[Install]
+WantedBy=multi-user.target
