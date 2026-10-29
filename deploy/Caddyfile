@@ -1,0 +1,25 @@
+{
+	# No admin API: config changes are applied by restarting the container.
+	admin off
+}
+
+# Plain HTTP on 8080. TLS is terminated by Tailscale Funnel in front of this.
+:8080 {
+	encode gzip
+
+	handle /api/* {
+		# The backend allows 7 files x 1 MB; reject anything far larger before it reaches Node.
+		request_body {
+			max_size 10MB
+		}
+		reverse_proxy host.docker.internal:3000
+	}
+
+	# Everything else is the built React app. /metrics is never proxied, so it falls through
+	# to the SPA's index.html instead of reaching the backend.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
