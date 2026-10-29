@@ -1,7 +1,7 @@
 import express from "express"
 import multer from "multer"
 import path from "node:path"
-import { mkdtempDisposable, writeFile, readFile } from "node:fs/promises"
+import { mkdtempDisposable, writeFile, readFile, chmod } from "node:fs/promises"
 import os from "node:os"
 import { EngineTimeoutError, EngineExitError, RENDER_FAILURE_EXIT_CODE, runEngine, removeStaleJobContainers } from "./engineCaller.js"
 import { MAX_ACTIVE_JOBS, tryAcquireJobSlot } from "./jobLimiter.js"
@@ -113,6 +113,11 @@ app.post("/api/upload", uploadConfig.array("files", 7), async (req, res) => {
         );
 
         workspacePath = workDir.path;
+
+        // mkdtemp creates the directory as 0700. The engine container runs as UID 10001, not as
+        // the backend's user, so on Linux it could not list the inputs or write work.pdf.
+        // Docker Desktop on Windows ignores these modes, which is why this only shows up on Linux.
+        await chmod(workspacePath, 0o777);
 
         // console.log("Workspace created for this request:", workspacePath);
         
