@@ -1,5 +1,7 @@
 ## reportgen
 
+[![CI](https://github.com/Golden-purple/reportgen/actions/workflows/ci.yml/badge.svg?branch=agent)](https://github.com/Golden-purple/reportgen/actions/workflows/ci.yml)
+
 CLI tool to automate the tedious part of report submission: running your programs, capturing their output, and compiling everything into a PDF.
 
 Point `reportgen` to a directory of program files. It will:
