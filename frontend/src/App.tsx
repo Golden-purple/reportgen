@@ -50,11 +50,11 @@ function Main() {
               Upload your assignments and generate a PDF report automatically.
             </p>
             <p className="technical">
-              For .py, .cpp, .c files. (OpenMP supported for both C++ and C.)
+              For .py, .cpp, .c files.
             </p>
-            <p className="notif">
+            {/* <p className="notif">
               Support for MPI coming later.
-            </p>
+            </p> */}
           </div>
         </section>  
 
